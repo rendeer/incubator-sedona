@@ -1,17 +1,17 @@
 ## Supported platforms
 
-Sedona supports Spark 2.4 and 3.0. Sedona Scala/Java/Python also work with Spark 2.3 but we have no plan to officially support it.
+Sedona supports Spark 2.4 and 3.0, Python 3.7 - 3.9. Sedona Scala/Java/Python also work with Spark 2.3, Python 3.6 but we have no plan to officially support it.
 
 Sedona is compiled and tested on Java 1.8 and Scala 2.11/2.12:
 
-|             | Spark 2.4 | Spark 3.0 |
+|             | Spark 2.4 | Spark 3.0+ |
 |:-----------:| :---------:|:---------:|
 | Scala 2.11  |  ✅  |  not tested  |
 | Scala 2.12 | ✅  |  ✅  |
 
 Sedona Python is tested on the following Python and Spark verisons:
 
-|             | Spark 2.4 (Scala 2.11) | Spark 3.0 (Scala 2.12)|
+|             | Spark 2.4 (Scala 2.11) | Spark 3.0+ (Scala 2.12)|
 |:-----------:|:---------:|:---------:|
 | Python 3.7  |  ✅  |  ✅  |
 | Python 3.8 | not tested  |  ✅  |
@@ -20,11 +20,11 @@ Sedona Python is tested on the following Python and Spark verisons:
 
 ## Direct download
 
-[Release notes](../GeoSpark-All-Modules-Release-notes)
+[Release notes](../release-notes)
 
 Latest source code: [GitHub repository](https://github.com/apache/incubator-sedona/).
 
-Release source code and binary jars: [GitHub releases](https://github.com/apache/incubator-sedona/releases), [Maven Central](../GeoSpark-All-Modules-Maven-Central-Coordinates).
+Release source code and binary jars: [GitHub releases](https://github.com/apache/incubator-sedona/releases), [Maven Central](../maven-coordinates).
 
 Automatically generated binary JARs (per each Master branch commit): [GitHub Action](https://github.com/apache/incubator-sedona/actions?query=workflow%3A%22Scala+and+Java+build%22).
 
@@ -51,7 +51,7 @@ You need to install necessary packages if your system does not have them install
 
 ### Install sedona
 
-* Installing from PyPi repositories
+* Installing from PyPi repositories. You can find the latest Sedona Python on [PyPi](https://pypi.org/project/apache-sedona/). [There is an known issue in Sedona v1.0.1 and earlier versions](../release-notes/#known-issue).
 
 ```bash
 pip install apache-sedona
@@ -68,14 +68,14 @@ python3 setup.py install
 
 ### Prepare python-adapter jar
 
-Sedona Python needs one additional jar file called `sedona-python-adapter` to work properly. Please make sure you use the correct version for Spark and Scala. For Spark 3.0 + Scala 2.12, it is called `sedona-python-adapter-3.0_2.12-1.0.0-incubating.jar`
+Sedona Python needs one additional jar file called `sedona-python-adapter` to work properly. Please make sure you use the correct version for Spark and Scala. For Spark 3.0 + Scala 2.12, it is called `sedona-python-adapter-3.0_2.12-1.0.1-incubating.jar`
 
 You can get it using one of the following methods:
 
 1. Compile from the source within main project directory and copy it (in `python-adapter/target` folder) to SPARK_HOME/jars/ folder ([more details](/download/compile/#compile-scala-and-java-source-code))
 
 2. Download from [GitHub release](https://github.com/apache/incubator-sedona/releases) and copy it to SPARK_HOME/jars/ folder
-3. Call the [Maven Central coordinate](../GeoSpark-All-Modules-Maven-Central-Coordinates) in your python program. For example, in PySparkSQL
+3. Call the [Maven Central coordinate](../maven-coordiantes) in your python program. For example, in PySparkSQL
 ```python
 spark = SparkSession. \
     builder. \
@@ -83,8 +83,8 @@ spark = SparkSession. \
     config("spark.serializer", KryoSerializer.getName). \
     config("spark.kryo.registrator", SedonaKryoRegistrator.getName). \
     config('spark.jars.packages',
-           'org.apache.sedona:sedona-python-adapter-3.0_2.12:1.0.0-incubating,'
-           'org.datasyslab:geotools-wrapper:geotools-24.0'). \
+           'org.apache.sedona:sedona-python-adapter-3.0_2.12:1.0.1-incubating,'
+           'org.datasyslab:geotools-wrapper:geotools-24.1'). \
     getOrCreate()
 ```
 

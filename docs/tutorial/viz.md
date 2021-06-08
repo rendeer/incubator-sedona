@@ -5,7 +5,7 @@ SedonaViz provides native support for general cartographic design by extending S
 SedonaViz offers Map Visualization SQL. This gives users a more flexible way to design beautiful map visualization effects including scatter plots and heat maps. SedonaViz RDD API is also available.
 
 !!!note
-	All SedonaViz SQL/DataFrame APIs are explained in [SedonaViz API](../api/viz/sql). Please see [Viz exmaple project](https://github.com/apache/incubator-sedona/tree/master/examples/viz)
+	All SedonaViz SQL/DataFrame APIs are explained in [SedonaViz API](../../api/viz/sql). Please see [Viz exmaple project](https://github.com/apache/incubator-sedona/tree/master/examples/viz)
 
 ## Why scalable map visualization?
 
@@ -17,7 +17,7 @@ SedonaViz encapsulates the main steps of map visualization process, e.g., pixeli
 This tutorial mainly focuses on explaining SQL/DataFrame API. SedonaViz RDD example can be found in Please see [Viz exmaple project](https://github.com/apache/incubator-sedona/tree/master/examples/viz)
 
 ## Set up dependencies
-1. Read [Sedona Maven Central coordinates](../download/GeoSpark-All-Modules-Maven-Central-Coordinates.md)
+1. Read [Sedona Maven Central coordinates](../download/maven-coordinates.md)
 2. Add [Apache Spark core](https://mvnrepository.com/artifact/org.apache.spark/spark-core_2.11), [Apache SparkSQL](https://mvnrepository.com/artifact/org.apache.spark/spark-sql), Sedona-core, Sedona-SQL, Sedona-Viz
 
 ## Initiate SparkSession
@@ -70,7 +70,7 @@ SELECT ST_Point(cast(pointtable._c0 as Decimal(24,20)),cast(pointtable._c1 as De
 FROM pointtable
 ```
 
-As you know, Sedona provides many different methods to load various spatial data formats. Please read [Write an Spatial DataFrame application](sql).
+As you know, Sedona provides many different methods to load various spatial data formats. Please read [Write an Spatial DataFrame application](../sql).
 
 ## Generate a single image
 
@@ -87,12 +87,22 @@ CREATE OR REPLACE TEMP VIEW boundtable AS
 SELECT ST_Envelope_Aggr(shape) as bound FROM pointtable
 ```
 
-Then use ST_Pixelize to conver them to pixels.
+Then use ST_Pixelize to convert them to pixels.
+
+This example is for Sedona before v1.0.1. ST_Pixelize extends Generator so it can directly flatten the array without the **explode** function.
 
 ```sql
 CREATE OR REPLACE TEMP VIEW pixels AS
 SELECT pixel, shape FROM pointtable
 LATERAL VIEW ST_Pixelize(ST_Transform(shape, 'epsg:4326','epsg:3857'), 256, 256, (SELECT ST_Transform(bound, 'epsg:4326','epsg:3857') FROM boundtable)) AS pixel
+```
+
+This example is for Sedona on and after v1.0.1. ST_Pixelize returns an array of pixels. You need to use **explode** to flatten it.
+
+```sql
+CREATE OR REPLACE TEMP VIEW pixels AS
+SELECT pixel, shape FROM pointtable
+LATERAL VIEW explode(ST_Pixelize(ST_Transform(shape, 'epsg:4326','epsg:3857'), 256, 256, (SELECT ST_Transform(bound, 'epsg:4326','epsg:3857') FROM boundtable))) AS pixel
 ```
 
 This will give you a 256*256 resolution image after you run ST_Render at the end of this tutorial.
@@ -123,7 +133,7 @@ SELECT pixel, ST_Colorize(weight, (SELECT max(weight) FROM pixelaggregates)) as 
 FROM pixelaggregates
 ```
 
-Please read [ST_Colorize](../api/viz/sql/#st_colorize) for a detailed API description.
+Please read [ST_Colorize](../../api/viz/sql/#st_colorize) for a detailed API description.
 
 ### Render the image
 
@@ -155,12 +165,12 @@ imageGenerator.SaveRasterImageAsLocalFile(image, System.getProperty("user.dir")+
 
 ## Generate map tiles
 
-If you are a map tile professional, you may need to generate map tiles for different zoom levels and eventually create the map tile layer.
+If you are a map professional, you may need to generate map tiles for different zoom levels and eventually create the map tile layer.
 
 
 ### Pixelization and pixel aggregation
 
-Please first do pixelization and pixel aggregation using the same commands in single image generation. In ST_Pixelize, you need specify a very high resolution.
+Please first do pixelization and pixel aggregation using the same commands in single image generation. In ST_Pixelize, you need specify a very high resolution, such as 1000*1000. Note that, each dimension should be divisible by 2^zoom-level 
 
 ### Create tile name
 
@@ -184,10 +194,12 @@ You now need to group pixels by tiles and then render map tile images in paralle
 
 ```sql
 CREATE OR REPLACE TEMP VIEW images AS
-SELECT ST_Render(pixel, color) AS image
+SELECT ST_Render(pixel, color, 3) AS image
 FROM pixelaggregates
 GROUP BY pid
 ```
+
+"3" is the zoom level for these map tiles.
 
 ### Store map tiles on disk
 

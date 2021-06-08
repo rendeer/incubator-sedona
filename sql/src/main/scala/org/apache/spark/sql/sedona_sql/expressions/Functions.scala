@@ -18,31 +18,32 @@
  */
 package org.apache.spark.sql.sedona_sql.expressions
 
-import org.apache.sedona.core.geometryObjects.{Circle, GeoJSONWriterNew}
+import org.apache.sedona.core.geometryObjects.Circle
 import org.apache.sedona.core.utils.GeomUtils
 import org.apache.sedona.sql.utils.GeometrySerializer
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
+import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, CodegenFallback, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.{Expression, Generator}
 import org.apache.spark.sql.catalyst.util.{ArrayData, GenericArrayData}
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.sedona_sql.expressions.implicits._
+import org.apache.spark.sql.sedona_sql.expressions.subdivide.GeometrySubDivider
 import org.apache.spark.sql.types.{ArrayType, _}
 import org.apache.spark.unsafe.types.UTF8String
 import org.geotools.geometry.jts.JTS
 import org.geotools.referencing.CRS
 import org.locationtech.jts.algorithm.MinimumBoundingCircle
 import org.locationtech.jts.geom.{PrecisionModel, _}
-import org.locationtech.jts.io.WKBWriter
+import org.locationtech.jts.linearref.LengthIndexedLine
 import org.locationtech.jts.operation.IsSimpleOp
 import org.locationtech.jts.operation.buffer.BufferParameters
 import org.locationtech.jts.operation.linemerge.LineMerger
 import org.locationtech.jts.operation.valid.IsValidOp
 import org.locationtech.jts.precision.GeometryPrecisionReducer
 import org.locationtech.jts.simplify.TopologyPreservingSimplifier
-import org.locationtech.jts.linearref.LengthIndexedLine
 import org.opengis.referencing.operation.MathTransform
+import org.wololo.jts2geojson.GeoJSONWriter
 
 import java.util
 import scala.collection.mutable.ArrayBuffer
@@ -479,7 +480,7 @@ case class ST_AsGeoJSON(inputExpressions: Seq[Expression])
     inputExpressions.validateLength(1)
     val geometry = inputExpressions.head.toGeometry(input)
 
-    val writer = new GeoJSONWriterNew()
+    val writer = new GeoJSONWriter()
     UTF8String.fromString(writer.write(geometry).toString)
   }
 
@@ -1122,4 +1123,48 @@ case class ST_FlipCoordinates(inputExpressions: Seq[Expression])
   override def dataType: DataType = GeometryUDT
 
   override def children: Seq[Expression] = inputExpressions
+}
+
+
+case class ST_SubDivide(inputExpressions: Seq[Expression])
+  extends Expression with CodegenFallback {
+  override def nullable: Boolean = true
+
+  override def eval(input: InternalRow): Any = {
+    inputExpressions.validateLength(2)
+    val geometryRaw = inputExpressions.head
+    val maxVerticesRaw = inputExpressions(1)
+    geometryRaw.toGeometry(input) match {
+      case geom: Geometry => ArrayData.toArrayData(
+        GeometrySubDivider.subDivide(geom, maxVerticesRaw.toInt(input)).map(_.toGenericArrayData)
+      )
+      case null => null
+    }
+
+  }
+
+  override def dataType: DataType = ArrayType(GeometryUDT)
+
+  override def children: Seq[Expression] = inputExpressions
+}
+
+case class ST_SubDivideExplode(children: Seq[Expression]) extends Generator {
+  override def eval(input: InternalRow): TraversableOnce[InternalRow] = {
+    children.validateLength(2)
+    val geometryRaw = children.head
+    val maxVerticesRaw = children(1)
+    geometryRaw.toGeometry(input) match {
+      case geom: Geometry => ArrayData.toArrayData(
+        GeometrySubDivider.subDivide(geom, maxVerticesRaw.toInt(input)).map(_.toGenericArrayData)
+      )
+        GeometrySubDivider.subDivide(geom, maxVerticesRaw.toInt(input)).map(_.toGenericArrayData).map(InternalRow(_))
+      case _ => new Array[InternalRow](0)
+    }
+  }
+  override def elementSchema: StructType = {
+    new StructType()
+      .add("geom", GeometryUDT, true)
+  }
+
+  override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = ev
 }
